@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:latest
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: dtmeet
+    ports:
+      - "3306:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./scripts/schema.sql:/docker-entrypoint-initdb.d/1.sql
+    networks:
+      - app-network
+
+  app:
+    image: macbook22/video-conference-api:latest
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/dtmeet
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.MySQLDialect
+      REPO_URL: https://github.com/Artem-ka-create/video-conference-api.git
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./dt-video-conference-app
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - REPO_URL=https://github.com/Artem-ka-create/dt-video-conference-app.git
+      - BRANCH=master
+    command: >
+      /bin/sh -c "
+      if [ -d '/app/.git' ]; then
+        git --work-tree=/app --git-dir=/app/.git pull origin $$BRANCH;
+      else
+        git clone -b $$BRANCH $$REPO_URL /app;
+      fi;
+      cd /app;
+      npm install;
+      npm run build;
+      serve -s build -l 3000"
+    networks:
+      - app-network
+
+
+networks:
+  app-network:
+
+volumes:
+  db-data:
